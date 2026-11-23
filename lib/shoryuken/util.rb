@@ -11,6 +11,11 @@ module Shoryuken
       Shoryuken.logger
     end
 
+    def source_queue_for(messages)
+      message = messages.is_a?(Array) ? messages.first : messages
+      message.source_queue if message.respond_to?(:source_queue)
+    end
+
     # Fires a lifecycle event to all registered handlers
     #
     # @param event [Symbol] the event name to fire

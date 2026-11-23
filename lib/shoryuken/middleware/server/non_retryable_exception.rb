@@ -73,7 +73,7 @@ module Shoryuken
           entries = messages.map.with_index { |message, i| { id: i.to_s, receipt_handle: message.receipt_handle } }
 
           begin
-            queue_client = Shoryuken::Client.queues(queue)
+            queue_client = source_queue_for(sqs_msg) || Shoryuken::Client.queues(queue)
             delete_failed = queue_client.delete_messages(entries: entries)
 
             # Check if deletion reported failures (returns true if any failed)

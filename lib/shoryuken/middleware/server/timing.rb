@@ -12,11 +12,11 @@ module Shoryuken
         #
         # @param _worker [Object] the worker instance (unused)
         # @param queue [String] the queue name
-        # @param _sqs_msg [Shoryuken::Message] the message being processed (unused)
+        # @param sqs_msg [Shoryuken::Message, Array<Shoryuken::Message>] the message or batch
         # @param _body [Object] the parsed message body (unused)
         # @yield continues to the next middleware in the chain
         # @return [void]
-        def call(_worker, queue, _sqs_msg, _body)
+        def call(_worker, queue, sqs_msg, _body)
           started_at = Time.now
 
           logger.info { "started at #{started_at}" }
@@ -25,7 +25,8 @@ module Shoryuken
 
           total_time = elapsed(started_at)
 
-          if (total_time / 1000.0) > (timeout = Shoryuken::Client.queues(queue).visibility_timeout)
+          source_queue = source_queue_for(sqs_msg) || Shoryuken::Client.queues(queue)
+          if (total_time / 1000.0) > (timeout = source_queue.visibility_timeout)
             logger.warn { "exceeded the queue visibility timeout by #{total_time - (timeout * 1000)} ms" }
           end
 

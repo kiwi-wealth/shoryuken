@@ -23,6 +23,13 @@ module Shoryuken
       instance
     end
 
+    # Loads only SQS routing configuration for processes that enqueue jobs.
+    def self.load_queue_routes(config_file:)
+      file_options = new(config_file: config_file).send(:config_file_options)
+      routing_keys = %i[sqs_clients sqs_queue_routes]
+      Client.configure_queue_routes(Shoryuken.options.slice(*routing_keys).merge(file_options.slice(*routing_keys)))
+    end
+
     # Loads the environment for Rails console usage
     #
     # @return [void]
@@ -81,6 +88,12 @@ module Shoryuken
 
     private
 
+    def configure_queue_routes
+      return unless Shoryuken.options.key?(:sqs_queue_routes) || Shoryuken.options.key?(:sqs_clients)
+
+      Client.configure_queue_routes
+    end
+
     # Sets up the queues and requires the workers, the part of {#load} that comes before validation
     #
     # @return [void]
@@ -88,6 +101,7 @@ module Shoryuken
       prefix_active_job_queue_names
       parse_queues
       require_workers
+      configure_queue_routes
     end
 
     # Merges configuration file options with runtime options

@@ -119,7 +119,6 @@ RSpec.describe Shoryuken::Message do
     let(:receive_count) { '3' }
 
     before do
-      allow(Shoryuken::Client).to receive(:queues).with(queue.url).and_return(queue)
       allow(queue).to receive(:max_receive_count).and_return(max_receive_count)
     end
 

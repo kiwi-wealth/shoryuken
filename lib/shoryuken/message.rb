@@ -84,6 +84,9 @@ module Shoryuken
     # @return [String] The name of the queue this message came from
     attr_accessor :queue_name
 
+    # The queue and client selected when this message was received.
+    attr_reader :source_queue
+
     # @return [Aws::SQS::Types::Message] The raw SQS message data
     attr_accessor :data
 
@@ -98,6 +101,7 @@ module Shoryuken
       self.data       = data
       self.queue_url  = queue.url
       self.queue_name = queue.name
+      @source_queue    = queue
     end
 
     # Tells whether this is the last receive before SQS moves the message to the dead-letter queue.
@@ -116,7 +120,7 @@ module Shoryuken
     #     raise
     #   end
     def last_receive?
-      max = Shoryuken::Client.queues(queue_url).max_receive_count
+      max = source_queue.max_receive_count
       count = receive_count
 
       return false unless max && count

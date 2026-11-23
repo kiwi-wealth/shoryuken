@@ -40,6 +40,38 @@ $ bundle
 
 Check the [Getting Started](https://github.com/ruby-shoryuken/shoryuken/wiki/Getting-Started) page.
 
+### Different AWS credentials per queue
+
+Define named SQS clients and map queue aliases to them in `shoryuken.yml`. Aliases let one process use two queues with the same AWS name:
+
+```yaml
+sqs_clients:
+  east: { profile: orders-east, region: us-east-1 }
+  west: { profile: orders-west, region: us-west-2 }
+sqs_queue_routes:
+  orders-east:
+    client: east
+    queue: https://sqs.us-east-1.amazonaws.com/111111111111/orders
+  orders-west:
+    client: west
+    queue: https://sqs.us-west-2.amazonaws.com/222222222222/orders
+queues:
+  - [orders-east, 1]
+  - [orders-west, 1]
+```
+
+Use the alias in `shoryuken_options queue:`, enqueue overrides, and Active Job's `queue_as`. If Active Job adds a prefix, use the resulting name (for example `myapp_orders-east`) as the route key and configure the polling entry according to the existing prefixing settings. Route keys are exact: a physical queue name, URL, or ARN does not implicitly match an alias.
+
+The worker loads routes from its config file before it starts polling. In a separate producer process, load the same routes before the first enqueue:
+
+```ruby
+Shoryuken::EnvironmentLoader.load_queue_routes(config_file: Rails.root.join('config/shoryuken.yml'))
+```
+
+YAML profiles read from the AWS shared credentials file, not the SDK's default credential chain. For assume-role, SSO, or another provider, register a prebuilt `Aws::SQS::Client` with `Shoryuken.sqs_named_clients[:name] = client` and reference that name in a route without defining it again under `sqs_clients`. Register it in an initializer or a file loaded by `--require`. Routes become active after those files load, so don't enqueue from their top-level code. In a Ruby-only setup, set `Shoryuken.options[:sqs_queue_routes]` and call `Shoryuken::Client.configure_queue_routes` before enqueueing or polling.
+
+Unmapped identifiers use the existing default client. Mapped queues never fall back to it, and `shoryuken sqs` administration is unchanged. Grant each identity only the operations it needs: for example, attribute reads, receives, deletes, and visibility changes for consumers, or attribute reads and sends for producers. For targets specified by name, also allow `GetQueueUrl`. A single process has access to all configured identities; use separate processes if you need process-level isolation.
+
 ## More Information
 
 For more information check the [wiki page](https://github.com/ruby-shoryuken/shoryuken/wiki).

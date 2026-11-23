@@ -64,6 +64,7 @@ module Shoryuken
     :fifo_message_deduplication=,
     :sqs_client,
     :sqs_client=,
+    :sqs_named_clients,
     :sqs_client_receive_message_opts,
     :sqs_client_receive_message_opts=,
     :receive_message_opts_for,

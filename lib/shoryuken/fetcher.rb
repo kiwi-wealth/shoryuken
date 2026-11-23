@@ -94,7 +94,7 @@ module Shoryuken
       # several messages from the same group and break ordering.
       options.merge!(queue.options)
 
-      options[:max_number_of_messages] = max_number_of_messages(shoryuken_queue, limit, options)
+      options[:max_number_of_messages] = max_number_of_messages(shoryuken_queue, queue.name, limit, options)
 
       shoryuken_queue.receive_messages(options)
     end
@@ -102,11 +102,12 @@ module Shoryuken
     # Determines the maximum number of messages to fetch
     #
     # @param shoryuken_queue [Shoryuken::Queue] the queue instance
+    # @param queue_name [String] the configured queue identifier
     # @param limit [Integer] the requested limit
     # @param options [Hash] receive options that may contain max_number_of_messages
     # @option options [Integer] :max_number_of_messages optional override for max messages
     # @return [Integer] the maximum number of messages to fetch
-    def max_number_of_messages(shoryuken_queue, limit, options)
+    def max_number_of_messages(shoryuken_queue, queue_name, limit, options)
       # For FIFO queues we want to make sure we process one message per group at a time
       # if we set max_number_of_messages greater than 1,
       # SQS may return more than one message for the same message group
@@ -116,7 +117,7 @@ module Shoryuken
       # > in a strict order relative to the message group
       # > (however, messages that belong to different message groups might be processed out of order).
       # > https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagegroupid-property.html
-      limit = 1 if shoryuken_queue.fifo? && !batched_queue?(shoryuken_queue)
+      limit = 1 if shoryuken_queue.fifo? && !Shoryuken.worker_registry.batch_receive_messages?(queue_name)
 
       [limit, FETCH_LIMIT, options[:max_number_of_messages]].compact.min
     end
@@ -127,14 +128,6 @@ module Shoryuken
     # @return [Hash] the receive options hash
     def receive_options(queue)
       Shoryuken.receive_message_opts_for(queue.name, @group)
-    end
-
-    # Checks if a queue uses batch message processing
-    #
-    # @param queue [Shoryuken::Queue] the queue to check
-    # @return [Boolean] true if the queue is configured for batch processing
-    def batched_queue?(queue)
-      Shoryuken.worker_registry.batch_receive_messages?(queue.name)
     end
   end
 end

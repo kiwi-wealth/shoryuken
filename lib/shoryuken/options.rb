@@ -169,6 +169,11 @@ module Shoryuken
       @sqs_client ||= Aws::SQS::Client.new(options[:aws])
     end
 
+    # Prebuilt named clients available to queue routes configured in Ruby or YAML.
+    def sqs_named_clients
+      @sqs_named_clients ||= {}
+    end
+
     # Sets the SQS client receive message options for the default group
     #
     # @param sqs_client_receive_message_opts [Hash] the options hash

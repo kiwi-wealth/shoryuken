@@ -157,12 +157,13 @@ module Shoryuken
     # Handles completion of processor work
     #
     # @param queue [String] the queue name
+    # @param source_queue [Shoryuken::Queue, nil] the queue the message was fetched from
     # @return [void]
-    def processor_done(queue)
+    def processor_done(queue, source_queue = nil)
       @busy_processors.decrement
       fire_utilization_update_event
 
-      client_queue = Shoryuken::Client.queues(queue)
+      client_queue = source_queue || Shoryuken::Client.queues(queue)
       return unless client_queue.fifo?
       return unless @polling_strategy.respond_to?(:message_processed)
 
@@ -188,6 +189,7 @@ module Shoryuken
 
       logger.debug { "Assigning #{sqs_msg.message_id}" }
 
+      source_queue = source_queue_for(sqs_msg)
       @busy_processors.increment
       fire_utilization_update_event
 
@@ -203,7 +205,7 @@ module Shoryuken
           Processor.process(queue_name, sqs_msg)
         ensure
           Thread.current.priority = original_priority
-          processor_done(queue_name)
+          processor_done(queue_name, source_queue)
         end
       rescue Exception
         # Processor.process already passed the error to the exception handlers. A custom

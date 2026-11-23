@@ -6,6 +6,8 @@ module Shoryuken
       # Middleware that automatically deletes messages after successful processing.
       # Only deletes messages when the worker has auto_delete enabled.
       class AutoDelete
+        include Util
+
         # Processes a message and deletes it if auto_delete is enabled
         #
         # @param worker [Object] the worker instance
@@ -21,7 +23,7 @@ module Shoryuken
 
           entries = [sqs_msg].flatten.map.with_index { |message, i| { id: i.to_s, receipt_handle: message.receipt_handle } }
 
-          Shoryuken::Client.queues(queue).delete_messages(entries: entries)
+          (source_queue_for(sqs_msg) || Shoryuken::Client.queues(queue)).delete_messages(entries: entries)
         end
       end
     end

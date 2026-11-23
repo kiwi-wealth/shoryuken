@@ -51,7 +51,7 @@ module Shoryuken
           # @param _body [Object] the parsed message body (unused)
           # @return [Shoryuken::Helpers::TimerTask] the timer task
           def auto_extend(_worker, queue, sqs_msg, _body)
-            visibility_timeout = message_visibility_timeout(queue)
+            visibility_timeout = message_visibility_timeout(queue, sqs_msg)
             execution_interval = extension_interval(visibility_timeout)
 
             unless execution_interval
@@ -82,9 +82,9 @@ module Shoryuken
           #
           # @param queue [String] the queue name
           # @return [Integer] the visibility timeout in seconds
-          def message_visibility_timeout(queue)
+          def message_visibility_timeout(queue, sqs_msg)
             Shoryuken.receive_message_opts_for(queue, queue_group(queue))[:visibility_timeout] ||
-              Shoryuken::Client.queues(queue).visibility_timeout
+              (source_queue_for(sqs_msg) || Shoryuken::Client.queues(queue)).visibility_timeout
           end
 
           # Finds the group a queue belongs to, whose receive options apply when the queue has none of its own

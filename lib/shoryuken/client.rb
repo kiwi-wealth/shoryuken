@@ -19,7 +19,22 @@ module Shoryuken
       # @param name [String, Symbol] the name of the queue
       # @return [Shoryuken::Queue] the queue instance
       def queues(name)
-        @@queues_mutex.synchronize { @@queues[name.to_s] ||= Shoryuken::Queue.new(sqs, name) }
+        identifier = name.to_s
+        @@queues_mutex.synchronize do
+          @@queues[identifier] ||= begin
+            client, target = @queue_routes&.resolve(identifier) || [sqs, identifier]
+            Shoryuken::Queue.new(client, target)
+          end
+        end
+      end
+
+      # Installs routes at boot, before starting consumers or producers.
+      def configure_queue_routes(options = Shoryuken.options)
+        routes = QueueRoutes.new(options, Shoryuken.sqs_named_clients)
+        @@queues_mutex.synchronize do
+          @queue_routes = routes
+          @@queues = {}
+        end
       end
 
       # Returns the current SQS client

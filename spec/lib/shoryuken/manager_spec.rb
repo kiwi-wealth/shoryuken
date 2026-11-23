@@ -255,7 +255,7 @@ RSpec.describe Shoryuken::Manager do
     end
 
     it 'runs completion exactly once on success' do
-      expect(subject).to receive(:processor_done).with(queue).once.and_call_original
+      expect(subject).to receive(:processor_done).with(queue, nil).once.and_call_original
 
       subject.send(:assign, queue, sqs_msg)
 
@@ -265,7 +265,7 @@ RSpec.describe Shoryuken::Manager do
     it 'runs completion exactly once when processing raises' do
       allow(Shoryuken::Processor).to receive(:process).and_raise('processing failed')
 
-      expect(subject).to receive(:processor_done).with(queue).once.and_call_original
+      expect(subject).to receive(:processor_done).with(queue, nil).once.and_call_original
 
       subject.send(:assign, queue, sqs_msg)
 
@@ -373,6 +373,14 @@ RSpec.describe Shoryuken::Manager do
 
     before do
       allow(Shoryuken::Client).to receive(:queues).with(queue).and_return(sqs_queue)
+    end
+
+    it 'checks FIFO on the received message source without looking up the queue again' do
+      source = instance_double(Shoryuken::Queue, fifo?: true)
+      expect(Shoryuken::Client).not_to receive(:queues)
+      expect(polling_strategy).to receive(:message_processed).with(queue)
+
+      subject.send(:processor_done, queue, source)
     end
 
     context 'when queue.fifo? is true' do
