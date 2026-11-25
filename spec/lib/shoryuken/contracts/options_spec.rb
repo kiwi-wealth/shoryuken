@@ -84,6 +84,7 @@ RSpec.describe Shoryuken::Contracts::Options do
     it { expect_invalid('delay', options.merge(delay: '-1')) }
     it { expect_invalid('timeout', options.merge(timeout: '8')) }
     it { expect_invalid('aws', options.merge(aws: 'us-east-1')) }
+    it { expect_invalid('sqs_strict_queue_routes', options.merge(sqs_strict_queue_routes: 'true')) }
     it { expect_invalid('queues', options.merge(queues: 'default')) }
     it { expect_invalid('queues', options.merge(queues: [%w[default high]])) }
     it { expect_invalid('queues', options.merge(queues: [['default', 1, 2]])) }

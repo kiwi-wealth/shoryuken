@@ -14,6 +14,7 @@ en:
       aws_format: needs to be a Hash
       sqs_clients_format: needs to be a Hash
       sqs_queue_routes_format: needs to be a Hash
+      sqs_strict_queue_routes_format: needs to be a boolean
       lifecycle_events_format: needs to be a Hash
       config_file_format: needs to be nil, a String or a Pathname
       require_format: needs to be nil or a String

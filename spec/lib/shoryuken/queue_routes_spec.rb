@@ -24,6 +24,7 @@ RSpec.describe Shoryuken::QueueRoutes do
     Shoryuken.sqs_named_clients.clear
     Shoryuken.options.delete(:sqs_queue_routes)
     Shoryuken.options.delete(:sqs_clients)
+    Shoryuken.options.delete(:sqs_strict_queue_routes)
     Shoryuken::Client.configure_queue_routes({})
   end
 
@@ -110,6 +111,84 @@ RSpec.describe Shoryuken::QueueRoutes do
     expect { Shoryuken::Client.queues('orders-east') }.to raise_error(Aws::SQS::Errors::AccessDenied)
     expect(default.api_requests).to be_empty
     expect(Shoryuken::Client.queues('orders').client).to eq(default)
+  end
+
+  it 'rejects unknown queues in strict mode but permits explicit default-client routes' do
+    config = {
+      sqs_strict_queue_routes: true,
+      sqs_queue_routes: routes.merge('local' => { client: nil, queue: east_url })
+    }
+    Shoryuken::Client.configure_queue_routes(config)
+
+    expect(Shoryuken::Client.queues('local').client).to eq(default)
+    expect(Shoryuken::Client.queues('orders-east').client).to eq(east)
+    expect { TestWorker.perform_async('job', queue: 'orders-typo') }.to raise_error(
+      Shoryuken::Errors::InvalidConfigurationError, /No SQS queue route configured for "orders-typo"/
+    )
+    expect(default.api_requests.map { |r| r[:operation_name] }).to eq([:get_queue_attributes])
+  end
+
+  it 'blocks enqueues before routes load when strict routing is enabled early, even for cached queues' do
+    default.stub_responses(:get_queue_url, queue_url: east_url)
+    Shoryuken::Client.queues('orders-east')
+    Shoryuken::Client.enable_strict_queue_routes!
+    requests_before = default.api_requests.size
+
+    expect { TestWorker.perform_async('job', queue: 'orders-east') }.to raise_error(
+      Shoryuken::Errors::InvalidConfigurationError, /No SQS queue route configured/
+    )
+    expect(default.api_requests.size).to eq(requests_before)
+
+    Shoryuken.options[:sqs_queue_routes] = routes
+    Shoryuken::Client.configure_queue_routes
+    TestWorker.perform_async('job', queue: 'orders-east')
+    expect(east.api_requests.map { |r| r[:operation_name] }).to include(:send_message)
+  end
+
+  it 'does not use a cached fallback after strict routing is enabled in options' do
+    default.stub_responses(:get_queue_url, queue_url: east_url)
+    Shoryuken::Client.queues('unmapped')
+    Shoryuken.options[:sqs_strict_queue_routes] = true
+
+    expect { Shoryuken::Client.queues('unmapped') }.to raise_error(
+      Shoryuken::Errors::InvalidConfigurationError, /unmapped/
+    )
+  end
+
+  it 'loads strict routing for producer processes from YAML' do
+    Tempfile.create('shoryuken-strict-routes') do |file|
+      file.write(
+        YAML.dump(
+          'sqs_strict_queue_routes' => true,
+          'sqs_queue_routes' => { 'local' => { 'client' => nil, 'queue' => east_url } }
+        )
+      )
+      file.flush
+      Shoryuken::EnvironmentLoader.load_queue_routes(config_file: file.path)
+    end
+
+    expect(Shoryuken::Client.queues('local').client).to eq(default)
+    expect { Shoryuken::Client.queues('unknown') }.to raise_error(Shoryuken::Errors::InvalidConfigurationError)
+  end
+
+  it 'validates strict mode and requires an explicit client field' do
+    expect { Shoryuken::Client.configure_queue_routes(sqs_strict_queue_routes: 'true') }.to raise_error(
+      Shoryuken::Errors::InvalidConfigurationError, /sqs_strict_queue_routes/
+    )
+    expect { Shoryuken::Client.configure_queue_routes(sqs_queue_routes: { local: { queue: east_url } }) }.to raise_error(
+      Shoryuken::Errors::InvalidConfigurationError, /sqs_queue_routes.local.client/
+    )
+  end
+
+  it 'rejects an unmapped polling queue during startup in strict mode' do
+    Shoryuken.options[:sqs_strict_queue_routes] = true
+    Shoryuken.options[:sqs_queue_routes] = routes
+    Shoryuken.options[:queues] = ['orders-typo']
+
+    expect { Shoryuken::EnvironmentLoader.new({}).check }.to raise_error(
+      Shoryuken::Errors::InvalidConfigurationError, /orders-typo/
+    )
+    expect([default, east, west].flat_map(&:api_requests)).to be_empty
   end
 
   it 'selects only the requested shared credentials profile and rejects missing profiles' do

@@ -72,6 +72,20 @@ YAML profiles read from the AWS shared credentials file, not the SDK's default c
 
 Unmapped identifiers use the existing default client. Mapped queues never fall back to it, and `shoryuken sqs` administration is unchanged. Grant each identity only the operations it needs: for example, attribute reads, receives, deletes, and visibility changes for consumers, or attribute reads and sends for producers. For targets specified by name, also allow `GetQueueUrl`. A single process has access to all configured identities; use separate processes if you need process-level isolation.
 
+#### Strict queue routing
+
+Set `sqs_strict_queue_routes: true` to reject any queue identifier without an explicit route instead of using the default client. To explicitly use the default client, set `client: null`:
+
+```yaml
+sqs_strict_queue_routes: true
+sqs_queue_routes:
+  local-orders:
+    client: null
+    queue: orders
+```
+
+In Ruby, use `client: nil`. Strict mode is off by default. Both consumers and producers must load the strict setting and routes. YAML settings take effect when routes are loaded, not before. To prevent early enqueues from falling back, call `Shoryuken::Client.enable_strict_queue_routes!` before loading application code that might enqueue, then load the routes as above. Until routes are installed, queue lookups raise; retain `sqs_strict_queue_routes: true` in the configuration.
+
 ## More Information
 
 For more information check the [wiki page](https://github.com/ruby-shoryuken/shoryuken/wiki).

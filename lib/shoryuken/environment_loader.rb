@@ -26,7 +26,7 @@ module Shoryuken
     # Loads only SQS routing configuration for processes that enqueue jobs.
     def self.load_queue_routes(config_file:)
       file_options = new(config_file: config_file).send(:config_file_options)
-      routing_keys = %i[sqs_clients sqs_queue_routes]
+      routing_keys = %i[sqs_clients sqs_queue_routes sqs_strict_queue_routes]
       Client.configure_queue_routes(Shoryuken.options.slice(*routing_keys).merge(file_options.slice(*routing_keys)))
     end
 
@@ -89,7 +89,7 @@ module Shoryuken
     private
 
     def configure_queue_routes
-      return unless Shoryuken.options.key?(:sqs_queue_routes) || Shoryuken.options.key?(:sqs_clients)
+      return unless %i[sqs_queue_routes sqs_clients sqs_strict_queue_routes].any? { |key| Shoryuken.options.key?(key) }
 
       Client.configure_queue_routes
     end

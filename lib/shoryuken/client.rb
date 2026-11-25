@@ -21,18 +21,40 @@ module Shoryuken
       def queues(name)
         identifier = name.to_s
         @@queues_mutex.synchronize do
+          if (@strict_queue_routes || Shoryuken.options[:sqs_strict_queue_routes] == true) &&
+             !@queue_routes&.include?(identifier)
+            raise Errors::InvalidConfigurationError, "No SQS queue route configured for #{identifier.inspect}"
+          end
+
           @@queues[identifier] ||= begin
-            client, target = @queue_routes&.resolve(identifier) || [sqs, identifier]
+            route = @queue_routes&.resolve(identifier)
+            client, target = route || [sqs, identifier]
             Shoryuken::Queue.new(client, target)
           end
         end
       end
 
+      # Enables strict routing before application code can enqueue.
+      def enable_strict_queue_routes!
+        @@queues_mutex.synchronize do
+          Shoryuken.options[:sqs_strict_queue_routes] = true
+          @strict_queue_routes = true
+          @queue_routes = nil
+          @@queues = {}
+        end
+      end
+
       # Installs routes at boot, before starting consumers or producers.
       def configure_queue_routes(options = Shoryuken.options)
+        strict = options.fetch(:sqs_strict_queue_routes, false)
+        unless [true, false].include?(strict)
+          raise Errors::InvalidConfigurationError, 'sqs_strict_queue_routes must be a boolean'
+        end
+
         routes = QueueRoutes.new(options, Shoryuken.sqs_named_clients)
         @@queues_mutex.synchronize do
           @queue_routes = routes
+          @strict_queue_routes = strict
           @@queues = {}
         end
       end

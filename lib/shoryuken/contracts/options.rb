@@ -23,6 +23,7 @@ module Shoryuken
       optional(:aws) { |value| value.is_a?(Hash) }
       optional(:sqs_clients) { |value| value.is_a?(Hash) }
       optional(:sqs_queue_routes) { |value| value.is_a?(Hash) }
+      optional(:sqs_strict_queue_routes) { |value| [true, false].include?(value) }
       optional(:lifecycle_events) { |value| value.is_a?(Hash) }
       optional(:config_file) { |value| value.nil? || value.is_a?(String) || value.respond_to?(:to_path) }
       optional(:require) { |value| value.nil? || value.is_a?(String) }

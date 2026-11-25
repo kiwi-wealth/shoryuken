@@ -20,9 +20,15 @@ module Shoryuken
         path = "sqs_queue_routes.#{name}"
         route = validate_fields(definition, path, %w[client queue])
         client = route.fetch('client')
-        invalid!("#{path}.client", 'must reference a named SQS client') unless @clients[client] || @profiles[client]
+        unless client.nil? || @clients[client] || @profiles[client]
+          invalid!("#{path}.client", 'must reference a named SQS client or be null for the default client')
+        end
         @routes[name] = route
       end
+    end
+
+    def include?(identifier)
+      @routes.key?(identifier)
     end
 
     # Called under the Client queue-cache mutex.
@@ -30,7 +36,8 @@ module Shoryuken
       return unless (route = @routes[identifier])
 
       name = route.fetch('client')
-      [@clients[name] ||= build_client(name), route.fetch('queue')]
+      client = name.nil? ? Client.sqs : (@clients[name] ||= build_client(name))
+      [client, route.fetch('queue')]
     end
 
     private
@@ -55,7 +62,9 @@ module Shoryuken
 
       fields.each do |field|
         value = values[field]
-        if field == 'client' && value.is_a?(Symbol)
+        if field == 'client' && values.key?(field) && value.nil?
+          next
+        elsif field == 'client' && value.is_a?(Symbol)
           values[field] = value.to_s
         elsif !value.is_a?(String) || value.strip.empty?
           invalid!("#{path}.#{field}", 'must be a non-empty string')
